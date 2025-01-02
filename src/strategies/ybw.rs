@@ -10,7 +10,7 @@ extern crate rayon;
 use super::super::interface::*;
 use super::super::util::*;
 use super::iterative::{IterativeOptions, Stats};
-use super::sync_util::{timeout_signal, CachePadded, ThreadLocal};
+use super::sync_util::{par_iter_in_order, timeout_signal, CachePadded, ThreadLocal};
 use super::table::*;
 use super::util::*;
 
@@ -271,7 +271,7 @@ where
             let alpha = AtomicI16::new(alpha);
             let best_move = Mutex::new(ValueMove::new(initial_value, first_move));
             // Parallel search
-            let result = moves[1..].par_iter().with_max_len(1).try_for_each(|&m| -> Option<()> {
+            let result = par_iter_in_order(&moves[1..]).try_for_each(|&m| -> Option<()> {
                 // Check to see if we're cancelled by another branch.
                 let initial_alpha = alpha.load(Ordering::SeqCst);
                 if initial_alpha >= beta {

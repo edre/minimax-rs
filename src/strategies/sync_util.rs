@@ -1,8 +1,10 @@
 use std::ops::{Deref, DerefMut};
-use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread::{sleep, spawn};
 use std::time::Duration;
+
+use rayon::prelude::*;
 
 pub(super) fn timeout_signal(dur: Duration) -> Arc<AtomicBool> {
     // Theoretically we could include an async runtime to do this and use
@@ -146,4 +148,14 @@ impl<T> DerefMut for CachePadded<T> {
     fn deref_mut(&mut self) -> &mut T {
         &mut self.value
     }
+}
+
+/// Iterate through the given array in parallel, but whenever any
+/// thread starts a new item it gets the next one in line.
+pub(super) fn par_iter_in_order<T: Send + Sync>(array: &[T]) -> impl ParallelIterator<Item = &T> {
+    let index = AtomicUsize::new(0);
+    (0..array.len())
+        .into_par_iter()
+        .with_max_len(1)
+        .map(move |_| &array[index.fetch_add(1, Ordering::SeqCst)])
 }
