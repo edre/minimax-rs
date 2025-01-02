@@ -9,10 +9,10 @@ extern crate rayon;
 
 use super::super::interface::*;
 use super::super::util::*;
+use super::common::*;
 use super::iterative::{IterativeOptions, Stats};
 use super::sync_util::{par_iter_in_order, timeout_signal, CachePadded, ThreadLocal};
 use super::table::*;
-use super::util::*;
 
 use rayon::prelude::*;
 use std::cmp::max;

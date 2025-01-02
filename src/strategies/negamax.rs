@@ -5,7 +5,7 @@
 
 use super::super::interface::*;
 use super::super::util::*;
-use super::util::*;
+use super::common::*;
 use rand::seq::SliceRandom;
 use std::cmp::max;
 

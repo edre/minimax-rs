@@ -6,10 +6,10 @@
 
 use super::super::interface::*;
 use super::super::util::*;
+use super::common::*;
 #[cfg(not(target_arch = "wasm32"))]
 use super::sync_util::timeout_signal;
 use super::table::*;
-use super::util::*;
 
 use instant::Instant;
 use rand::prelude::SliceRandom;

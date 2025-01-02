@@ -1,4 +1,4 @@
-use super::util::{move_to_front, unclamp_value};
+use super::common::{move_to_front, unclamp_value};
 use crate::interface::*;
 use std::cmp::{max, min};
 use std::sync::atomic::{AtomicU32, AtomicU8, Ordering};

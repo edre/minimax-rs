@@ -1,7 +1,7 @@
 use super::super::interface::*;
 use super::super::util::AppliedMove;
+use super::common::{move_id, pv_string, random_best};
 use super::sync_util::*;
-use super::util::{move_id, pv_string, random_best};
 
 use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
