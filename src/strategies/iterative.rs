@@ -683,7 +683,7 @@ where
                             let end = Instant::now();
                             let interval = end - interval_start;
                             eprintln!(
-                                "Iterative aspiration depth{:>2} took{:>5}ms; bounds{:>5} bestmove={}",
+                                "Iterative aspiration depth{:>2} took{:>5}ms; bounds{:>5}; bestmove={}",
                                 depth,
                                 interval.as_millis(),
                                 entry.bounds(),
@@ -706,7 +706,7 @@ where
             if self.opts.verbose {
                 let interval = Instant::now() - interval_start;
                 eprintln!(
-                    "Iterative fullsearch depth{:>2} took{:>5}ms; value{:>6} bestmove={}",
+                    "Iterative fullsearch depth{:>2} took{:>5}ms; value{:>6}; bestmove={}",
                     depth,
                     interval.as_millis(),
                     entry.value_string(),
