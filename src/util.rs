@@ -17,20 +17,20 @@ pub(crate) struct AppliedMove<'a, G: Game> {
     m: <G as Game>::M,
 }
 
-impl<'a, G: Game> std::ops::Deref for AppliedMove<'a, G> {
+impl<G: Game> std::ops::Deref for AppliedMove<'_, G> {
     type Target = <G as Game>::S;
     fn deref(&self) -> &<G as Game>::S {
         self.new.as_ref().unwrap_or(self.old)
     }
 }
 
-impl<'a, G: Game> std::ops::DerefMut for AppliedMove<'a, G> {
+impl<G: Game> std::ops::DerefMut for AppliedMove<'_, G> {
     fn deref_mut(&mut self) -> &mut <G as Game>::S {
         self.new.as_mut().unwrap_or(self.old)
     }
 }
 
-impl<'a, G: Game> Drop for AppliedMove<'a, G> {
+impl<G: Game> Drop for AppliedMove<'_, G> {
     fn drop(&mut self) {
         <G as Game>::undo(self.old, self.m)
     }
