@@ -436,6 +436,6 @@ where
         }
 
         // Partially degrade old values, to bias towards new data.
-        self.history_table.iter_mut().for_each(|n| *n >>= 1);
+        self.history_table.iter_mut().for_each(|n| *n >>= 3);
     }
 }
