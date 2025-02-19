@@ -3,8 +3,9 @@ use super::super::util::AppliedMove;
 use super::common::{move_id, pv_string, random_best};
 use super::sync_util::*;
 
-use rand::rngs::ThreadRng;
-use rand::seq::SliceRandom;
+use rand::prelude::IndexedRandom;
+use rand::rngs::SmallRng;
+use rand::SeedableRng;
 use std::marker::PhantomData;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32};
@@ -170,7 +171,7 @@ pub trait RolloutPolicy {
     /// The provided move vec is for scratch space.
     fn random_move(
         &self, state: &mut <Self::G as Game>::S, move_scratch: &mut Vec<<Self::G as Game>::M>,
-        rng: &mut ThreadRng,
+        rng: &mut SmallRng,
     ) -> <Self::G as Game>::M;
 
     /// Implementation of a rollout over many random moves. Not needed to be overridden.
@@ -178,7 +179,7 @@ pub trait RolloutPolicy {
     where
         <Self::G as Game>::S: Clone,
     {
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
         let mut depth = options.max_rollout_depth;
         let mut state = state.clone();
         let mut moves = Vec::new();
@@ -228,7 +229,7 @@ impl<G: Game> RolloutPolicy for DumbRolloutPolicy<G> {
     type G = G;
     fn random_move(
         &self, state: &mut <Self::G as Game>::S, moves: &mut Vec<<Self::G as Game>::M>,
-        rng: &mut ThreadRng,
+        rng: &mut SmallRng,
     ) -> <Self::G as Game>::M {
         G::generate_moves(state, moves);
         *moves.choose(rng).unwrap()
@@ -242,7 +243,7 @@ pub struct MonteCarloTreeSearch<G: Game> {
     max_rollouts: u32,
     max_time: Duration,
     timeout: Arc<AtomicBool>,
-    rollout_policy: Option<Box<dyn RolloutPolicy<G = G> + Sync>>,
+    rollout_policy: Option<Box<dyn RolloutPolicy<G = G> + Send + Sync>>,
     pv: Vec<G::M>,
     game_type: PhantomData<G>,
 }
@@ -264,7 +265,7 @@ impl<G: Game> MonteCarloTreeSearch<G> {
     /// random move generation to prefer certain kinds of moves, always choose
     /// winning moves, etc.
     pub fn new_with_policy(
-        options: MCTSOptions, policy: Box<dyn RolloutPolicy<G = G> + Sync>,
+        options: MCTSOptions, policy: Box<dyn RolloutPolicy<G = G> + Send + Sync>,
     ) -> Self {
         Self {
             options,

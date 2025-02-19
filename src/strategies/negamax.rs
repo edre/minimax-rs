@@ -22,7 +22,7 @@ impl<E: Evaluator> Negamax<E> {
         Negamax {
             max_depth: depth,
             move_pool: MovePool::<_>::default(),
-            rng: rand::thread_rng(),
+            rng: rand::rng(),
             prev_value: 0,
             eval,
         }

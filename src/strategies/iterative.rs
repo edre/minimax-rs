@@ -655,7 +655,7 @@ where
         let mut moves = Vec::new();
         E::G::generate_moves(&s_clone, &mut moves);
         // Start in a random order.
-        moves.shuffle(&mut rand::thread_rng());
+        moves.shuffle(&mut rand::rng());
         let mut moves = moves.into_iter().map(|m| ValueMove::new(0, m)).collect::<Vec<_>>();
 
         // Start at 1 or 2 to hit the max depth.

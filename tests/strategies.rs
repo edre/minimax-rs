@@ -10,7 +10,7 @@ extern crate rand;
 mod connect4;
 
 use minimax::*;
-use rand::seq::SliceRandom;
+use rand::prelude::IndexedRandom;
 use std::cmp::max;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
@@ -101,7 +101,7 @@ impl minimax::Evaluator for RandomEvaluator {
 }
 
 fn generate_random_state(depth: u8) -> connect4::Board {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut b = connect4::Board::default();
     for _ in 0..depth {
         let mut moves = Vec::new();

@@ -108,7 +108,7 @@ pub(super) fn random_best<T, F: Fn(&T) -> f32>(set: &[T], score_fn: F) -> Option
 
     let n = set.len();
     // Combine both random numbers into a single rng call.
-    let r = rand::thread_rng().gen_range(0..n * PRIMES.len());
+    let r = rand::rng().random_range(0..n * PRIMES.len());
     let mut i = r / PRIMES.len();
     let stride = PRIMES[r % PRIMES.len()];
 
