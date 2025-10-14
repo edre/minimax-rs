@@ -324,13 +324,12 @@ where
 
     fn iterative_search(
         &self, mut state: <E::G as Game>::S, max_depth: u8, background: bool,
-    ) -> Option<(<E::G as Game>::M, Evaluation)> {
+    ) -> Option<(<E::G as Game>::M, Evaluation, u8)> {
         self.table.concurrent_advance_generation();
         let root_hash = E::G::zobrist_hash(&state);
         let mut best_move = None;
         let mut best_value = 0;
         let mut interval_start;
-        let mut pv = String::new();
 
         let mut depth = max_depth % self.opts.step_increment;
         if depth == 0 {
@@ -359,8 +358,14 @@ where
 
             if self.opts.verbose && !background {
                 let interval = Instant::now() - interval_start;
+                let mut stats = Stats::default();
+                self.stats.do_all(|s| stats.add(s));
+                let mbf = stats.total_generated_moves as f64 / stats.total_generate_move_calls as f64;
+                let ebf = (stats.nodes_explored as f64).powf(((depth as f64) + 1.0).recip());
+                let nps = stats.nodes_explored as f64 / interval.as_secs_f64();
+                let count = stats.nodes_explored;
                 eprintln!(
-                    "Parallel (threads={}) depth{:>2} took{:>5}ms; returned{:>5}; bestmove {}",
+                    "Parallel (threads={}) depth={:>2}, took={:>6}ms; returned{:>5}; bestmove {}; MBF={mbf:>6.1} EBF={ebf:>6.1}; NPS={nps:>9.0}; total={count:>11}",
                     self.par_opts.num_threads(),
                     depth,
                     interval.as_millis(),
@@ -373,26 +378,12 @@ where
             let mut pv_moves = Vec::new();
             self.table.populate_pv::<E::G>(&mut pv_moves, &state);
             self.pv.lock().unwrap().clone_from(&pv_moves);
-            pv = pv_string::<E::G>(&pv_moves[..], &state);
             if unclamp_value(entry.value).abs() == BEST_EVAL {
                 break;
             }
         }
-        if self.opts.verbose && !background {
-            eprintln!("Principal variation: {}", pv);
-        }
-        best_move.map(|m| (m, best_value))
+        best_move.map(|m| (m, best_value, depth))
     }
-}
-
-fn pretty_stats(stats: &Stats, start: Instant) -> String {
-    let mean_branching_factor =
-        stats.total_generated_moves as f64 / stats.total_generate_move_calls as f64;
-    let throughput = (stats.nodes_explored) as f64 / (Instant::now() - start).as_secs_f64();
-    format!(
-        "Explored {} nodes. MBF={:.1}\n{} nodes/sec",
-        stats.nodes_explored, mean_branching_factor, throughput as usize
-    )
 }
 
 pub struct ParallelSearch<E: Evaluator> {
@@ -434,6 +425,22 @@ impl<E: Evaluator> ParallelSearch<E> {
     pub fn root_value(&self) -> Evaluation {
         unclamp_value(self.prev_value)
     }
+
+    fn pretty_stats(&self, stats: &Stats, start: Instant, minimax: &ParallelNegamaxer<E>, depth: u8) -> String {
+        let interval = Instant::now() - start;
+        let mbf =
+            stats.total_generated_moves as f64 / stats.total_generate_move_calls as f64;
+        let ebf =
+            (stats.nodes_explored as f64).powf((depth as f64 + 1.0).recip());
+        let nps = (stats.nodes_explored) as f64 / interval.as_secs_f64();
+        let count = stats.nodes_explored;
+        format!(
+            "Parallel (threads={}) depth={:>2}, took={:>6.0}ms;                                         MBF={mbf:>6.1} EBF={ebf:>6.1}; NPS={nps:>9.0}; total={count:>11}",
+            minimax.par_opts.num_threads(), 
+            depth, 
+            interval.as_secs_f64()*1000.0,
+        )
+    }
 }
 
 impl<E: Evaluator> Strategy<E::G> for ParallelSearch<E>
@@ -466,15 +473,18 @@ where
                 &self.thread_pool,
             );
             // Launch in threadpool and wait for result.
-            let value_move = self
+            let value_move_depth = self
                 .thread_pool
                 .install(|| negamaxer.iterative_search(s.clone(), self.max_depth, false));
             self.principal_variation = negamaxer.principal_variation();
             let mut stats = Stats::default();
-            negamaxer.stats.do_all(|local| stats.add(local));
+            negamaxer.stats.do_all_mut(|local| stats.add(local));
             if self.opts.verbose {
-                eprintln!("{}", pretty_stats(&stats, start_time));
+                eprintln!("{}", "——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————");
+                eprintln!("{}", self.pretty_stats(&stats, start_time, &negamaxer, value_move_depth.map_or(0, |v| v.2)));
+                eprintln!("principal variation: {}", pv_string::<E::G>(&self.principal_variation(), s));
             }
+            let value_move = value_move_depth.map(|v| (v.0, v.1));
             value_move
         }?;
         self.prev_value = value;

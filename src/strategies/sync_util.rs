@@ -101,8 +101,14 @@ impl<T: Send> ThreadLocal<T> {
     }
 
     // With a &mut self, no other threads can be using it.
-    pub(super) fn do_all<F: FnMut(&mut T)>(&mut self, f: F) {
+    pub(super) fn do_all_mut<F: FnMut(&mut T)>(&mut self, f: F) {
         self.locals.iter_mut().for_each(f);
+    }
+
+    // This is extremely suspicious, but parallel-reads mapping each threadlocal
+    // into an output element. Good for interior mutability tasks.
+    pub(super) fn do_all<F: FnMut(&T)>(&self, f: F) {
+        self.locals.iter().for_each(f);
     }
 }
 
@@ -114,7 +120,7 @@ fn test_threadlocal() {
     let count = 100000;
     (0..count).into_par_iter().for_each(|_| tls.local_do(|x| *x += 1));
     let mut sum = 0;
-    tls.do_all(|x| sum += *x);
+    tls.do_all_mut(|x| sum += *x);
     assert_eq!(sum, count);
 
     let result = std::panic::catch_unwind(|| {
