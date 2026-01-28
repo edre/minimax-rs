@@ -37,7 +37,7 @@ impl minimax::Game for Chess {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct Evaluator;
 
 impl minimax::Evaluator for Evaluator {
@@ -69,7 +69,11 @@ impl minimax::Evaluator for Evaluator {
 fn main() {
     let mut b = Board::default();
     let opts = minimax::IterativeOptions::new().verbose();
-    let mut strategy = minimax::IterativeSearch::new(Evaluator::default(), opts);
+    let mut strategy = minimax::ParallelSearch::new(
+        Evaluator::default(),
+        opts,
+        minimax::ParallelOptions::default(),
+    );
     strategy.set_timeout(std::time::Duration::from_secs(1));
     while Chess::get_winner(&b).is_none() {
         println!("{}", b);

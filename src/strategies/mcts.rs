@@ -3,13 +3,13 @@ use super::super::util::AppliedMove;
 use super::common::{move_id, pv_string, random_best};
 use super::sync_util::*;
 
+use rand::SeedableRng;
 use rand::prelude::IndexedRandom;
 use rand::rngs::SmallRng;
-use rand::SeedableRng;
 use std::marker::PhantomData;
+use std::sync::Arc;
 use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32};
-use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -462,6 +462,11 @@ where
         self.max_rollouts = 5u32
             .saturating_pow(depth as u32)
             .saturating_mul(self.options.rollouts_before_expanding + 1);
+    }
+
+    fn set_depth_or_timeout(&mut self, depth: u8, max_time: Duration) {
+        self.set_max_depth(depth);
+        self.max_time = max_time;
     }
 
     fn principal_variation(&self) -> Vec<G::M> {

@@ -163,6 +163,10 @@ pub trait Strategy<G: Game> {
     /// This can be changed between calls to choose_move.
     fn set_max_depth(&mut self, _depth: u8) {}
 
+    /// Set both and the search will end whichever comes first.
+    /// This can be changed between calls to choose_move.
+    fn set_depth_or_timeout(&mut self, _depth: u8, _timeout: std::time::Duration) {}
+
     /// From the last choose_move call, return the principal variation,
     /// i.e. the best sequence of moves for both players.
     fn principal_variation(&self) -> Vec<G::M> {

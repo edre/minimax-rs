@@ -101,4 +101,8 @@ where
     fn set_max_depth(&mut self, depth: u8) {
         self.max_depth = depth;
     }
+
+    fn set_depth_or_timeout(&mut self, depth: u8, _max_time: std::time::Duration) {
+        self.max_depth = depth;
+    }
 }

@@ -363,10 +363,10 @@ where
                 let mbf =
                     stats.total_generated_moves as f64 / stats.total_generate_move_calls as f64;
                 let ebf = (stats.nodes_explored as f64).powf(((depth as f64) + 1.0).recip());
-                let nps = stats.nodes_explored as f64 / interval.as_secs_f64();
+                let knps = stats.nodes_explored as f64 / (1e3 * interval.as_secs_f64());
                 let count = stats.nodes_explored;
                 eprintln!(
-                    "Parallel (threads={}) depth={:>2}, took={:>6}ms; returned{:>5}; bestmove {}; MBF={mbf:>6.1} EBF={ebf:>6.1}; NPS={nps:>9.0}; total={count:>11}",
+                    "Parallel (threads={}) depth={:>2}, took={:>6}ms; returned{:>5}; bestmove {}; MBF={mbf:>6.1} EBF={ebf:>6.1}; {knps:>7.0}kn/s; total={count:>11}",
                     self.par_opts.num_threads(),
                     depth,
                     interval.as_millis(),
@@ -534,6 +534,11 @@ where
     fn set_max_depth(&mut self, depth: u8) {
         self.max_depth = depth;
         self.max_time = Duration::new(0, 0);
+    }
+
+    fn set_depth_or_timeout(&mut self, depth: u8, max_time: Duration) {
+        self.max_time = max_time;
+        self.max_depth = depth;
     }
 
     fn principal_variation(&self) -> Vec<<E::G as Game>::M> {
