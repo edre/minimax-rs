@@ -11,7 +11,7 @@ use super::super::interface::*;
 use super::super::util::*;
 use super::common::*;
 use super::iterative::{IterativeOptions, Stats};
-use super::sync_util::{par_iter_in_order, timeout_signal, CachePadded, ThreadLocal};
+use super::sync_util::{CachePadded, ThreadLocal, par_iter_in_order, timeout_signal};
 use super::table::*;
 
 use rayon::prelude::*;
@@ -360,7 +360,8 @@ where
                 let interval = Instant::now() - interval_start;
                 let mut stats = Stats::default();
                 self.stats.do_all(|s| stats.add(s));
-                let mbf = stats.total_generated_moves as f64 / stats.total_generate_move_calls as f64;
+                let mbf =
+                    stats.total_generated_moves as f64 / stats.total_generate_move_calls as f64;
                 let ebf = (stats.nodes_explored as f64).powf(((depth as f64) + 1.0).recip());
                 let nps = stats.nodes_explored as f64 / interval.as_secs_f64();
                 let count = stats.nodes_explored;
@@ -426,19 +427,19 @@ impl<E: Evaluator> ParallelSearch<E> {
         unclamp_value(self.prev_value)
     }
 
-    fn pretty_stats(&self, stats: &Stats, start: Instant, minimax: &ParallelNegamaxer<E>, depth: u8) -> String {
+    fn pretty_stats(
+        &self, stats: &Stats, start: Instant, minimax: &ParallelNegamaxer<E>, depth: u8,
+    ) -> String {
         let interval = Instant::now() - start;
-        let mbf =
-            stats.total_generated_moves as f64 / stats.total_generate_move_calls as f64;
-        let ebf =
-            (stats.nodes_explored as f64).powf((depth as f64 + 1.0).recip());
+        let mbf = stats.total_generated_moves as f64 / stats.total_generate_move_calls as f64;
+        let ebf = (stats.nodes_explored as f64).powf((depth as f64 + 1.0).recip());
         let nps = (stats.nodes_explored) as f64 / interval.as_secs_f64();
         let count = stats.nodes_explored;
         format!(
             "Parallel (threads={}) depth={:>2}, took={:>6.0}ms;                                         MBF={mbf:>6.1} EBF={ebf:>6.1}; NPS={nps:>9.0}; total={count:>11}",
-            minimax.par_opts.num_threads(), 
-            depth, 
-            interval.as_secs_f64()*1000.0,
+            minimax.par_opts.num_threads(),
+            depth,
+            interval.as_secs_f64() * 1000.0,
         )
     }
 }
@@ -480,12 +481,24 @@ where
             let mut stats = Stats::default();
             negamaxer.stats.do_all_mut(|local| stats.add(local));
             if self.opts.verbose {
-                eprintln!("{}", "——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————");
-                eprintln!("{}", self.pretty_stats(&stats, start_time, &negamaxer, value_move_depth.map_or(0, |v| v.2)));
-                eprintln!("principal variation: {}", pv_string::<E::G>(&self.principal_variation(), s));
+                eprintln!(
+                    "——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————"
+                );
+                eprintln!(
+                    "{}",
+                    self.pretty_stats(
+                        &stats,
+                        start_time,
+                        &negamaxer,
+                        value_move_depth.map_or(0, |v| v.2)
+                    )
+                );
+                eprintln!(
+                    "principal variation: {}",
+                    pv_string::<E::G>(&self.principal_variation(), s)
+                );
             }
-            let value_move = value_move_depth.map(|v| (v.0, v.1));
-            value_move
+            value_move_depth.map(|v| (v.0, v.1))
         }?;
         self.prev_value = value;
 
