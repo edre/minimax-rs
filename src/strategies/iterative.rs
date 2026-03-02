@@ -601,6 +601,11 @@ where
         )
     }
 
+    /// Return the options used in this search.
+    pub fn options(&self) -> &IterativeOptions {
+        &self.opts
+    }
+
     #[doc(hidden)]
     pub fn root_value(&self) -> Evaluation {
         unclamp_value(self.prev_value)

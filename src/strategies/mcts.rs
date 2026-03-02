@@ -278,6 +278,11 @@ impl<G: Game> MonteCarloTreeSearch<G> {
         }
     }
 
+    /// Return the options used in this search.
+    pub fn options(&self) -> &MCTSOptions {
+        &self.options
+    }
+
     /// Instead of a timeout, run this many rollouts to choose a move.
     pub fn set_max_rollouts(&mut self, rollouts: u32) {
         self.max_time = Duration::default();

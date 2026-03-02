@@ -427,6 +427,15 @@ impl<E: Evaluator> ParallelSearch<E> {
         unclamp_value(self.prev_value)
     }
 
+    /// Return the search options used in this search.
+    pub fn options(&self) -> &IterativeOptions {
+        &self.opts
+    }
+    /// Return the parallel options used in this search.
+    pub fn parallel_options(&self) -> &ParallelOptions {
+        &self.par_opts
+    }
+
     fn pretty_stats(
         &self, stats: &Stats, start: Instant, minimax: &ParallelNegamaxer<E>, depth: u8,
     ) -> String {
