@@ -20,6 +20,8 @@ pub trait Evaluator {
     type G: Game;
     /// Evaluate the non-terminal state from the persective of the player to
     /// move next.
+    ///
+    /// The caller will first determine whether the game is at an end state.
     fn evaluate(&self, s: &<Self::G as Game>::S) -> Evaluation;
 
     /// Optional interface to support strategies using quiescence search.
@@ -84,7 +86,10 @@ pub trait Game: Sized {
     type M: Copy;
 
     /// Generate moves at the given state.
-    fn generate_moves(state: &Self::S, moves: &mut Vec<Self::M>);
+    ///
+    /// Returns the same output as `get_winner`, so that some games do not need
+    /// to generate moves twice.
+    fn generate_moves(state: &Self::S, moves: &mut Vec<Self::M>) -> Option<Winner>;
 
     /// Apply a move to get a new state.
     ///

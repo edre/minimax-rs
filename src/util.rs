@@ -110,12 +110,11 @@ where
     if depth == 0 {
         return 1;
     }
-    if G::get_winner(state).is_some() {
+    let mut moves = pool.alloc();
+    if G::generate_moves(state, &mut moves).is_some() {
         // Apparently perft rules only count positions at the target depth.
         return 0;
     }
-    let mut moves = pool.alloc();
-    G::generate_moves(state, &mut moves);
     let n = if depth == 1 {
         moves.len() as u64
     } else if depth <= single_thread_cutoff {
@@ -156,12 +155,11 @@ where
     if depth == 0 {
         return 1;
     }
-    if G::get_winner(state).is_some() {
+    let mut moves = pool.alloc();
+    if G::generate_moves(state, &mut moves).is_some() {
         // Apparently perft rules only count positions at the target depth.
         return 0;
     }
-    let mut moves = pool.alloc();
-    G::generate_moves(state, &mut moves);
     let n = if depth == 1 {
         moves.len() as u64
     } else {

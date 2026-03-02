@@ -435,9 +435,6 @@ where
             // Will just return the node's evaluation if quiescence search is disabled.
             return self.noisy_negamax(s, self.opts.max_quiescence_depth, alpha, beta);
         }
-        if let Some(winner) = E::G::get_winner(s) {
-            return Some(winner.evaluate());
-        }
 
         let alpha_orig = alpha;
         let hash = E::G::zobrist_hash(s);
@@ -446,16 +443,18 @@ where
             return Some(value);
         }
 
-        if self.null_move_check(s, depth, beta)? >= beta {
-            return Some(beta);
-        }
-
         let mut moves = self.move_pool.alloc();
-        E::G::generate_moves(s, &mut moves);
+        if let Some(winner) = E::G::generate_moves(s, &mut moves) {
+            return Some(winner.evaluate());
+        }
         self.stats.generate_moves(moves.len());
         if moves.is_empty() {
             self.move_pool.free(moves);
             return Some(WORST_EVAL);
+        }
+
+        if self.null_move_check(s, depth, beta)? >= beta {
+            return Some(beta);
         }
 
         // TODO: Also do a pre-search to look for moves much better than others.
@@ -641,9 +640,6 @@ where
     <E::G as Game>::M: Copy + Eq,
 {
     fn choose_move(&mut self, s: &<E::G as Game>::S) -> Option<<E::G as Game>::M> {
-        if E::G::get_winner(s).is_some() {
-            return None;
-        }
         self.negamaxer.table.advance_generation();
         self.negamaxer.countermoves.advance_generation(E::G::null_move(s));
         // Reset stats.
@@ -660,7 +656,9 @@ where
         let mut interval_start;
         // Store the moves so they can be reordered every iteration.
         let mut moves = Vec::new();
-        E::G::generate_moves(&s_clone, &mut moves);
+        if E::G::generate_moves(&s_clone, &mut moves).is_some() {
+            return None;
+        }
         // Start in a random order.
         moves.shuffle(&mut rand::rng());
         let mut moves = moves.into_iter().map(|m| ValueMove::new(0, m)).collect::<Vec<_>>();

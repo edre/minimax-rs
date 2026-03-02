@@ -10,9 +10,19 @@ impl minimax::Game for Chess {
     type S = Board;
     type M = ChessMove;
 
-    fn generate_moves(b: &Board, moves: &mut Vec<ChessMove>) {
+    fn generate_moves(b: &Board, moves: &mut Vec<ChessMove>) -> Option<minimax::Winner> {
+        // Implement Board::status ourselves to avoid generating moves twice.
         for m in MoveGen::new_legal(b) {
             moves.push(m);
+        }
+        if moves.is_empty() {
+            if *b.checkers() == chess::EMPTY {
+                Some(minimax::Winner::Draw)
+            } else {
+                Some(minimax::Winner::PlayerJustMoved)
+            }
+        } else {
+            None
         }
     }
 
@@ -69,11 +79,8 @@ impl minimax::Evaluator for Evaluator {
 fn main() {
     let mut b = Board::default();
     let opts = minimax::IterativeOptions::new().verbose();
-    let mut strategy = minimax::ParallelSearch::new(
-        Evaluator::default(),
-        opts,
-        minimax::ParallelOptions::default(),
-    );
+    let mut strategy =
+        minimax::ParallelSearch::new(Evaluator, opts, minimax::ParallelOptions::default());
     strategy.set_timeout(std::time::Duration::from_secs(1));
     while Chess::get_winner(&b).is_none() {
         println!("{}", b);

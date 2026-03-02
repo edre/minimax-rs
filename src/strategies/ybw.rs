@@ -189,10 +189,6 @@ where
             // Will just return the node's evaluation if quiescence search is disabled.
             return self.noisy_negamax(s, self.opts.max_quiescence_depth, alpha, beta);
         }
-        if let Some(winner) = E::G::get_winner(s) {
-            return Some(winner.evaluate());
-        }
-
         let alpha_orig = alpha;
         let hash = E::G::zobrist_hash(s);
         let mut good_move = None;
@@ -200,17 +196,18 @@ where
             return Some(value);
         }
 
-        if self.null_move_check(s, depth, beta)? >= beta {
-            return Some(beta);
-        }
-
         let mut moves = Vec::new();
         self.move_pool.local_do(|pool| moves = pool.alloc());
-        E::G::generate_moves(s, &mut moves);
-        self.stats.local_do(|stats| stats.generate_moves(moves.len()));
+        if let Some(winner) = E::G::generate_moves(s, &mut moves) {
+            return Some(winner.evaluate());
+        }
         if moves.is_empty() {
             self.move_pool.local_do(|pool| pool.free(moves));
             return Some(WORST_EVAL);
+        }
+
+        if self.null_move_check(s, depth, beta)? >= beta {
+            return Some(beta);
         }
 
         // Reorder moves.

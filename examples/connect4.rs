@@ -95,7 +95,10 @@ impl minimax::Game for Game {
     type S = Board;
     type M = Place;
 
-    fn generate_moves(b: &Board, moves: &mut Vec<Place>) {
+    fn generate_moves(b: &Board, moves: &mut Vec<Place>) -> Option<minimax::Winner> {
+        if let Some(winner) = Self::get_winner(b) {
+            return Some(winner);
+        }
         let mut cols = b.all_pieces;
         for i in 0..NUM_COLS {
             if cols & COL_MASK < COL_MASK {
@@ -103,6 +106,7 @@ impl minimax::Game for Game {
             }
             cols >>= HEIGHT;
         }
+        None
     }
 
     fn get_winner(b: &Board) -> Option<minimax::Winner> {
@@ -121,11 +125,7 @@ impl minimax::Game for Game {
         }
 
         // Full board with no winner.
-        if b.num_moves as u32 == NUM_ROWS * NUM_COLS {
-            Some(minimax::Winner::Draw)
-        } else {
-            None
-        }
+        if b.num_moves as u32 == NUM_ROWS * NUM_COLS { Some(minimax::Winner::Draw) } else { None }
     }
 
     fn apply(b: &mut Board, place: Place) -> Option<Board> {

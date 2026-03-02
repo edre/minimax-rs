@@ -39,14 +39,16 @@ impl<E: Evaluator> Negamax<E> {
     where
         <<E as Evaluator>::G as Game>::M: Copy,
     {
-        if let Some(winner) = E::G::get_winner(s) {
-            return winner.evaluate();
-        }
         if depth == 0 {
+            if let Some(winner) = E::G::get_winner(s) {
+                return winner.evaluate();
+            }
             return self.eval.evaluate(s);
         }
         let mut moves = self.move_pool.alloc();
-        E::G::generate_moves(s, &mut moves);
+        if let Some(winner) = E::G::generate_moves(s, &mut moves) {
+            return winner.evaluate();
+        }
         let mut best = WORST_EVAL;
         for m in moves.iter() {
             let mut new = AppliedMove::<E::G>::new(s, *m);
@@ -71,12 +73,11 @@ where
         if self.max_depth == 0 {
             return None;
         }
-        if E::G::get_winner(s).is_some() {
-            return None;
-        }
         let mut best = WORST_EVAL;
         let mut moves = self.move_pool.alloc();
-        E::G::generate_moves(s, &mut moves);
+        if E::G::generate_moves(s, &mut moves).is_some() {
+            return None;
+        }
         // Randomly permute order that we look at the moves.
         // We'll pick the first best score from this list.
         moves.shuffle(&mut self.rng);

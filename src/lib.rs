@@ -19,9 +19,10 @@
 //!     type S = War;
 //!     type M = Tug;
 //!
-//!     fn generate_moves(s: &War, moves: &mut Vec<Tug>) {
+//!     fn generate_moves(s: &War, moves: &mut Vec<Tug>) -> Option<minimax::Winner> {
 //!         moves.push(Tug(-1));
 //!         moves.push(Tug(1));
+//!         Self::get_winner(s)
 //!     }
 //!
 //!     fn get_winner(state: &War) -> Option<minimax::Winner> {

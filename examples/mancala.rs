@@ -31,16 +31,20 @@ impl minimax::Game for Mancala {
     type S = Board;
     type M = Move;
 
-    fn generate_moves(board: &Board, moves: &mut Vec<Move>) {
+    fn generate_moves(board: &Board, moves: &mut Vec<Move>) -> Option<minimax::Winner> {
+        if let Some(winner) = Self::get_winner(board) {
+            return Some(winner);
+        }
         if board.skipped {
             moves.push(0);
-            return;
+            return None;
         }
         for i in 1..7 {
             if board.pits[board.to_move as usize][i] > 0 {
                 moves.push(i as Move);
             }
         }
+        None
     }
 
     fn apply(board: &mut Board, m: Move) -> Option<Board> {

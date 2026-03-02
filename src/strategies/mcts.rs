@@ -37,11 +37,13 @@ struct NodeExpansion<M> {
     children: Vec<Node<M>>,
 }
 
-fn new_expansion<G: Game>(state: &G::S) -> Box<NodeExpansion<G::M>> {
+fn new_expansion<G: Game>(state: &G::S) -> Result<Box<NodeExpansion<G::M>>, Winner> {
     let mut moves = Vec::new();
-    G::generate_moves(state, &mut moves);
+    if let Some(winner) = G::generate_moves(state, &mut moves) {
+        return Err(winner);
+    }
     let children = moves.into_iter().map(|m| Node::new(Some(m))).collect::<Vec<_>>();
-    Box::new(NodeExpansion { children })
+    Ok(Box::new(NodeExpansion { children }))
 }
 
 impl<M> Node<M> {
@@ -168,11 +170,12 @@ pub trait RolloutPolicy {
 
     /// Custom function to choose random move during rollouts.
     /// Implementations can bias towards certain moves, ensure winning moves, etc.
+    /// If the given state is terminal, this function must return the winner instead.
     /// The provided move vec is for scratch space.
     fn random_move(
         &self, state: &mut <Self::G as Game>::S, move_scratch: &mut Vec<<Self::G as Game>::M>,
         rng: &mut SmallRng,
-    ) -> <Self::G as Game>::M;
+    ) -> Result<<Self::G as Game>::M, Winner>;
 
     /// Implementation of a rollout over many random moves. Not needed to be overridden.
     fn rollout(&self, options: &MCTSOptions, state: &<Self::G as Game>::S) -> i32
@@ -185,33 +188,35 @@ pub trait RolloutPolicy {
         let mut moves = Vec::new();
         let mut sign = 1;
         loop {
-            if let Some(winner) = Self::G::get_winner(&state) {
-                let first = depth == options.max_rollout_depth;
-                return match winner {
-                    Winner::PlayerJustMoved => {
-                        if first {
-                            WIN
-                        } else {
-                            1
+            moves.clear();
+            let m = match self.random_move(&mut state, &mut moves, &mut rng) {
+                Err(winner) => {
+                    let first = depth == options.max_rollout_depth;
+                    return match winner {
+                        Winner::PlayerJustMoved => {
+                            if first {
+                                WIN
+                            } else {
+                                1
+                            }
                         }
-                    }
-                    Winner::PlayerToMove => {
-                        if first {
-                            LOSS
-                        } else {
-                            -1
+                        Winner::PlayerToMove => {
+                            if first {
+                                LOSS
+                            } else {
+                                -1
+                            }
                         }
-                    }
-                    Winner::Draw => 0,
-                } * sign;
-            }
+                        Winner::Draw => 0,
+                    } * sign;
+                }
+                Ok(m) => m,
+            };
 
             if depth == 0 {
                 return 0;
             }
 
-            moves.clear();
-            let m = self.random_move(&mut state, &mut moves, &mut rng);
             if let Some(new_state) = Self::G::apply(&mut state, m) {
                 state = new_state;
             }
@@ -230,9 +235,11 @@ impl<G: Game> RolloutPolicy for DumbRolloutPolicy<G> {
     fn random_move(
         &self, state: &mut <Self::G as Game>::S, moves: &mut Vec<<Self::G as Game>::M>,
         rng: &mut SmallRng,
-    ) -> <Self::G as Game>::M {
-        G::generate_moves(state, moves);
-        *moves.choose(rng).unwrap()
+    ) -> Result<<Self::G as Game>::M, Winner> {
+        if let Some(winner) = G::generate_moves(state, moves) {
+            return Err(winner);
+        }
+        Ok(*moves.choose(rng).unwrap())
     }
 }
 
@@ -327,15 +334,16 @@ impl<G: Game> MonteCarloTreeSearch<G> {
                     return node.update_stats(self.rollout(state));
                 } else {
                     // Check for terminal node.
-                    match G::get_winner(state) {
-                        Some(Winner::PlayerJustMoved) => return node.update_stats(WIN),
-                        Some(Winner::PlayerToMove) => return node.update_stats(LOSS),
-                        Some(Winner::Draw) => return node.update_stats(0),
-                        _ => {}
+                    match new_expansion::<G>(state) {
+                        Err(Winner::PlayerJustMoved) => return node.update_stats(WIN),
+                        Err(Winner::PlayerToMove) => return node.update_stats(LOSS),
+                        Err(Winner::Draw) => return node.update_stats(0),
+                        Ok(expansion) => {
+                            // Expand this node, and force a rollout when we recurse.
+                            force_rollout = true;
+                            node.expansion.try_set(expansion)
+                        }
                     }
-                    // Expand this node, and force a rollout when we recurse.
-                    force_rollout = true;
-                    node.expansion.try_set(new_expansion::<G>(state))
                 }
             }
         };
@@ -379,7 +387,7 @@ where
     fn choose_move(&mut self, s: &G::S) -> Option<G::M> {
         let start_time = Instant::now();
         let root = Box::new(Node::<G::M>::new(None));
-        root.expansion.try_set(new_expansion::<G>(s));
+        root.expansion.try_set(new_expansion::<G>(s).ok()?);
 
         let num_threads = self.options.num_threads.unwrap_or_else(num_cpus::get) as u32;
         let (rollouts_per_thread, extra) = if self.max_rollouts == 0 {
