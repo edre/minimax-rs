@@ -26,7 +26,9 @@ where
 {
     fn choose_move(&mut self, s: &G::S) -> Option<G::M> {
         let mut moves = Vec::new();
-        G::generate_moves(s, &mut moves);
+        if G::generate_moves(s, &mut moves).is_some() {
+            return None;
+        }
         moves.choose(&mut rand::rng()).copied()
     }
 }
