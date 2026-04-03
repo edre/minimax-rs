@@ -7,6 +7,7 @@ pub mod negamax;
 pub mod random;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod ybw;
+pub mod expectiminimax;
 
 mod common;
 #[cfg(not(target_arch = "wasm32"))]

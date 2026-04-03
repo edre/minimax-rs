@@ -45,7 +45,13 @@ pub trait Evaluator {
 
     // TODO reorder moves by assigning value to each state and combining with countermoves table etc.
 }
-
+/// Allows the evaluator to be aware of the current player, useful for turn-based games.
+pub trait TurnBasedGameEvaluator : Evaluator
+where Self::G: TurnBasedGame
+{
+    /// Set the current player for evaluation purposes.
+    fn set_player_on_trait(&mut self, p: i8);
+}
 /// The result of playing a game until it finishes.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Winner {
@@ -154,6 +160,18 @@ pub trait Game: Sized {
     fn max_table_index() -> u16 {
         0
     }
+}
+/// Extends Game to support turn-based games where the current player is known.
+pub trait TurnBasedGame : Game {
+    /// Returns the current player (e.g. 1 or -1) for the given state.
+    fn current_player(state: &Self::S) -> i8;
+}
+/// Extends Game to support stochastic (random) moves.
+pub trait StochasticGame : Game {
+    /// Returns true if the current state requires a random move.
+    fn is_random_move(state: &Self::S) -> bool;
+    /// Returns the probability of a given move in the current state.
+    fn get_probability(state: &Self::S, mv: Self::M) -> f32;
 }
 
 /// Defines a method of choosing a move for the current player.
