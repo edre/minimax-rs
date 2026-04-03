@@ -6,16 +6,23 @@ use std::time::Duration;
 
 use rayon::prelude::*;
 
-pub(super) fn timeout_signal(dur: Duration) -> Arc<AtomicBool> {
+pub(super) fn timeout_signal(dur: Duration, signal: &Arc<AtomicBool>) -> Arc<()> {
+    // Simple token to keep alive as long as the search is performing
+    // If this token is dropped, the signal will not be sent
+    let token = Arc::new(());
+    let weak = Arc::downgrade(&token);
     // Theoretically we could include an async runtime to do this and use
     // fewer threads, but the stdlib implementation is only a few lines...
-    let signal = Arc::new(AtomicBool::new(false));
     let signal2 = signal.clone();
+    signal2.store(false, Ordering::Relaxed);
     spawn(move || {
+        //TODO: Find a way to stop the thread when search is done or cancelled before timeout
         sleep(dur);
-        signal2.store(true, Ordering::Relaxed);
+        if weak.upgrade().is_some() {
+            signal2.store(true, Ordering::Relaxed);
+        }
     });
-    signal
+    token
 }
 
 // An insert-only lock-free Option<Box<T>>

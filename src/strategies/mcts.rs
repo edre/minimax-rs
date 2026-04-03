@@ -1,3 +1,6 @@
+#[cfg(not(target_arch = "wasm32"))]
+use crate::strategies::iterative::SearchStopSignal;
+
 use super::super::interface::*;
 use super::super::util::AppliedMove;
 use super::common::{move_id, pv_string, random_best};
@@ -249,7 +252,7 @@ pub struct MonteCarloTreeSearch<G: Game> {
     options: MCTSOptions,
     max_rollouts: u32,
     max_time: Duration,
-    timeout: Arc<AtomicBool>,
+    timeout_or_cancel: Arc<AtomicBool>,
     rollout_policy: Option<Box<dyn RolloutPolicy<G = G> + Send + Sync>>,
     pv: Vec<G::M>,
     game_type: PhantomData<G>,
@@ -261,7 +264,7 @@ impl<G: Game> MonteCarloTreeSearch<G> {
             options,
             max_rollouts: 0,
             max_time: Duration::from_secs(5),
-            timeout: Arc::new(AtomicBool::new(false)),
+            timeout_or_cancel: Arc::new(AtomicBool::new(false)),
             rollout_policy: None,
             pv: Vec::new(),
             game_type: PhantomData,
@@ -278,11 +281,17 @@ impl<G: Game> MonteCarloTreeSearch<G> {
             options,
             max_rollouts: 0,
             max_time: Duration::from_secs(5),
-            timeout: Arc::new(AtomicBool::new(false)),
+            timeout_or_cancel: Arc::new(AtomicBool::new(false)),
             rollout_policy: Some(policy),
             pv: Vec::new(),
             game_type: PhantomData,
         }
+    }
+
+    /// Returns a handle to the signal used to stop the search.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn stop_signal(&self) -> SearchStopSignal {
+        SearchStopSignal(self.timeout_or_cancel.clone())
     }
 
     /// Return the options used in this search.
@@ -312,7 +321,7 @@ impl<G: Game> MonteCarloTreeSearch<G> {
         G: Sync,
         G::S: Clone,
     {
-        if self.timeout.load(Relaxed) {
+        if self.timeout_or_cancel.load(Relaxed) {
             return None;
         }
         let winner = node.winner.load(Relaxed);
@@ -396,10 +405,11 @@ where
             let rollouts_per_thread = self.max_rollouts / num_threads;
             (rollouts_per_thread, self.max_rollouts - rollouts_per_thread * num_threads)
         };
-        self.timeout = if self.max_time == Duration::default() {
-            Arc::new(AtomicBool::new(false))
+        let _cancel_timeout_on_drop = if self.max_time == Duration::default() {
+            self.timeout_or_cancel.store(false, Relaxed);
+            None
         } else {
-            timeout_signal(self.max_time)
+            Some(timeout_signal(self.max_time, &self.timeout_or_cancel))
         };
 
         thread::scope(|scope| {

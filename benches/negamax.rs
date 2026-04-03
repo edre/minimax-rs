@@ -29,6 +29,7 @@ fn bench_iterative(b: &mut Bencher) {
     });
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn bench_parallel(b: &mut Bencher) {
     let board = connect4::Board::default();
     b.iter(|| {
@@ -42,6 +43,8 @@ fn bench_parallel(b: &mut Bencher) {
         assert!(m.is_some());
     });
 }
-
+#[cfg(not(target_arch = "wasm32"))]
 benchmark_group!(benches, bench_negamax, bench_iterative, bench_parallel);
+#[cfg(target_arch = "wasm32")]
+benchmark_group!(benches, bench_negamax, bench_iterative);
 benchmark_main!(benches);

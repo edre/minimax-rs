@@ -14,7 +14,7 @@ use super::table::*;
 use instant::Instant;
 use rand::prelude::SliceRandom;
 use std::cmp::max;
-#[cfg(not(target_arch = "wasm32"))]
+//#[cfg(not(target_arch = "wasm32"))]
 use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -28,6 +28,29 @@ pub enum Replacement {
     TwoTier,
     // TODO: Bucket(size)
 }
+
+/// A shared signal used to request the termination of an ongoing search.
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Default)]
+pub struct SearchStopSignal(
+    pub(super) Arc<AtomicBool>
+);
+#[cfg(not(target_arch = "wasm32"))]
+impl SearchStopSignal {
+    #[doc(hidden)]
+    pub fn new() -> Self {
+        Self::default()
+    }
+    #[doc(hidden)]
+    pub fn from_atomic_bool(abool: Arc<AtomicBool>) -> Self {
+        Self(abool)
+    }
+    /// Requests the search to stop.
+    pub fn stop_search(&self) {
+        self.0.store(true, Ordering::Relaxed);
+    }
+}
+
 
 struct TranspositionTable<M> {
     table: Vec<Entry<M>>,
@@ -286,7 +309,7 @@ impl Stats {
 
 pub(super) struct Negamaxer<E: Evaluator, T> {
     #[cfg(not(target_arch = "wasm32"))]
-    timeout: Arc<AtomicBool>,
+    timeout_or_cancel: Arc<AtomicBool>,
     #[cfg(target_arch = "wasm32")]
     deadline: Instant,
     #[cfg(target_arch = "wasm32")]
@@ -307,7 +330,7 @@ where
     pub(super) fn new(table: T, eval: E, opts: IterativeOptions) -> Self {
         Self {
             #[cfg(not(target_arch = "wasm32"))]
-            timeout: Arc::new(AtomicBool::new(false)),
+            timeout_or_cancel: Arc::new(AtomicBool::new(false)),
             #[cfg(target_arch = "wasm32")]
             deadline: Instant::now(),
             #[cfg(target_arch = "wasm32")]
@@ -320,14 +343,14 @@ where
             stats: Stats::default(),
         }
     }
-
+    /// Returns a handle to the signal used to stop the search.
     #[cfg(not(target_arch = "wasm32"))]
-    pub(super) fn set_timeout(&mut self, timeout: Arc<AtomicBool>) {
-        self.timeout = timeout;
+    pub(super) fn stop_signal(&self) -> SearchStopSignal {
+        SearchStopSignal(self.timeout_or_cancel.clone())
     }
 
     #[cfg(target_arch = "wasm32")]
-    fn reset_timeout(&mut self, duration: Duration) {
+    fn reset_timeout(&mut self, duration: Duration) -> Option<Arc<()>> {
         self.timeout_counter = if duration == Duration::new(0, 0) {
             // Too high counter that never hits the maximum.
             1000
@@ -335,14 +358,16 @@ where
             0
         };
         self.deadline = Instant::now() + duration;
+        None
     }
     #[cfg(not(target_arch = "wasm32"))]
-    fn reset_timeout(&mut self, duration: Duration) {
-        self.set_timeout(if duration == Duration::new(0, 0) {
-            Arc::new(AtomicBool::new(false))
+    fn reset_timeout(&mut self, duration: Duration) -> Option<Arc<()>> {
+        if duration == Duration::new(0, 0) {
+            self.timeout_or_cancel.store(false, Ordering::Relaxed);
+            None
         } else {
-            timeout_signal(duration)
-        });
+            Some(timeout_signal(duration, &self.timeout_or_cancel))
+        }
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -356,7 +381,7 @@ where
     }
     #[cfg(not(target_arch = "wasm32"))]
     fn timeout_check(&mut self) -> bool {
-        self.timeout.load(Ordering::Relaxed)
+        self.timeout_or_cancel.load(Ordering::Relaxed)
     }
 
     fn null_move_check(
@@ -367,8 +392,8 @@ where
         {
             // Default to a minimum of depth=1 after null moving.
             if depth > depth_reduction &&
-	    // If the position already seems pretty awesome.
-	      self.eval.evaluate(s) >= beta
+            // If the position already seems pretty awesome.
+            self.eval.evaluate(s) >= beta
             {
                 // If we just pass and let the opponent play this position (at reduced depth),
                 let mut nulled = AppliedMove::<E::G>::new(s, null_move);
@@ -604,6 +629,11 @@ where
     pub fn options(&self) -> &IterativeOptions {
         &self.opts
     }
+    /// Returns a handle to the signal used to stop the search.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn stop_signal(&self) -> SearchStopSignal {
+        self.negamaxer.stop_signal()
+    }
 
     #[doc(hidden)]
     pub fn root_value(&self) -> Evaluation {
@@ -648,7 +678,7 @@ where
         self.actual_depth = 0;
         let start_time = Instant::now();
         // Start timer if configured.
-        self.negamaxer.reset_timeout(self.max_time);
+        let _cancel_timeout_on_drop = self.negamaxer.reset_timeout(self.max_time);
 
         let root_hash = E::G::zobrist_hash(s);
         let mut s_clone = s.clone();

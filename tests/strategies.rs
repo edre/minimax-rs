@@ -134,6 +134,7 @@ fn test_winning_position() {
 
     let opt = IterativeOptions::new();
     assert_eq!(None, IterativeSearch::new(RandomEvaluator::default(), opt).choose_move(&b));
+    #[cfg(not(target_arch = "wasm32"))]
     assert_eq!(
         None,
         ParallelSearch::new(RandomEvaluator::default(), opt, ParallelOptions::default())
@@ -199,21 +200,23 @@ fn compare_plain_negamax() {
                     b
                 );
             }
-
-            let opt = IterativeOptions::new().with_table_byte_size(64000);
-            let mut parallel =
-                ParallelSearch::new(RandomEvaluator::default(), opt, ParallelOptions::default());
-            parallel.set_max_depth(max_depth);
-            let par_move = parallel.choose_move(&b).unwrap();
-            let par_value = parallel.root_value();
-            assert_eq!(value, par_value, "search depth={}\n{}", max_depth, b);
-            assert!(
-                plain_negamax.best_moves.contains(&par_move),
-                "bad move={:?}\nsearch depth={}\n{}",
-                par_move,
-                max_depth,
-                b
-            );
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let opt = IterativeOptions::new().with_table_byte_size(64000);
+                let mut parallel =
+                    ParallelSearch::new(RandomEvaluator::default(), opt, ParallelOptions::default());
+                parallel.set_max_depth(max_depth);
+                let par_move = parallel.choose_move(&b).unwrap();
+                let par_value = parallel.root_value();
+                assert_eq!(value, par_value, "search depth={}\n{}", max_depth, b);
+                assert!(
+                    plain_negamax.best_moves.contains(&par_move),
+                    "bad move={:?}\nsearch depth={}\n{}",
+                    par_move,
+                    max_depth,
+                    b
+                );
+            }
         }
     }
 }
@@ -246,13 +249,15 @@ fn compare_deep_negamax() {
             mtdf.choose_move(&b).unwrap();
             let mtdf_value = mtdf.root_value();
             assert_eq!(value, mtdf_value, "search depth={}\n{}", max_depth, b);
-
-            let mut parallel =
-                ParallelSearch::new(RandomEvaluator::default(), opt, ParallelOptions::default());
-            parallel.set_max_depth(max_depth);
-            parallel.choose_move(&b).unwrap();
-            let parallel_value = parallel.root_value();
-            assert_eq!(value, parallel_value, "search iter={} depth={}\n{}", iter, max_depth, b);
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let mut parallel =
+                    ParallelSearch::new(RandomEvaluator::default(), opt, ParallelOptions::default());
+                parallel.set_max_depth(max_depth);
+                parallel.choose_move(&b).unwrap();
+                let parallel_value = parallel.root_value();
+                assert_eq!(value, parallel_value, "search iter={} depth={}\n{}", iter, max_depth, b);
+            }
         }
     }
 }

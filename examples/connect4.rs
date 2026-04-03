@@ -260,15 +260,22 @@ fn main() {
     let mut iterative =
         IterativeSearch::new(BasicEvaluator::default(), opts.clone().with_aspiration_window(5));
     iterative.set_max_depth(12);
+    
+    #[cfg(not(target_arch = "wasm32"))]
     let mut parallel = ParallelSearch::new(BasicEvaluator::default(), opts, ParallelOptions::new());
+    #[cfg(not(target_arch = "wasm32"))]
     parallel.set_max_depth(12);
-
+    #[cfg(not(target_arch = "wasm32"))]
     let mut strategies: [&mut dyn Strategy<self::Game>; 3] =
         [&mut dumb, &mut iterative, &mut parallel];
 
+    #[cfg(not(target_arch = "wasm32"))]
     if std::env::args().any(|arg| arg == "parallel") {
         strategies.swap(1, 2);
     }
+    #[cfg(target_arch = "wasm32")]
+    let mut strategies: [&mut dyn Strategy<self::Game>; 2] =
+        [&mut dumb, &mut iterative];
 
     let mut s = 0;
     while self::Game::get_winner(&b).is_none() {

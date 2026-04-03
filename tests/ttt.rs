@@ -4,7 +4,9 @@ extern crate minimax;
 mod ttt;
 
 use minimax::util::battle_royale;
-use minimax::{MCTSOptions, MonteCarloTreeSearch, Negamax, Random};
+#[cfg(not(target_arch = "wasm32"))]
+use minimax::{MCTSOptions, MonteCarloTreeSearch};
+use minimax::{Negamax, Random};
 
 // Ensure that two players using negamax always results in a draw.
 #[test]
@@ -28,6 +30,7 @@ fn test_ttt_negamax_vs_random_always_wins_or_draws() {
 }
 
 #[test]
+#[cfg(not(target_arch = "wasm32"))]
 fn test_ttt_mcts_vs_random_always_wins_or_draws() {
     let mut s1 = MonteCarloTreeSearch::new(MCTSOptions::default().with_num_threads(1));
     s1.set_max_rollouts(100);

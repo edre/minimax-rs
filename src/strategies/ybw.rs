@@ -7,6 +7,8 @@
 
 extern crate rayon;
 
+use crate::strategies::iterative::SearchStopSignal;
+
 use super::super::interface::*;
 use super::super::util::*;
 use super::common::*;
@@ -115,8 +117,8 @@ where
         {
             // Default to a minimum of depth=1 after null moving.
             if depth > depth_reduction &&
-	    // If the position already seems pretty awesome.
-	      self.eval.evaluate(s) >= beta
+            // If the position already seems pretty awesome.
+            self.eval.evaluate(s) >= beta
             {
                 // If we just pass and let the opponent play this position (at reduced depth),
                 let mut nulled = AppliedMove::<E::G>::new(s, null_move);
@@ -389,6 +391,7 @@ pub struct ParallelSearch<E: Evaluator> {
     max_time: Duration,
 
     background_cancel: Arc<AtomicBool>,
+    stop_signal: Arc<AtomicBool>,
     table: Arc<LockfreeTable<<E::G as Game>::M>>,
     prev_value: Evaluation,
     principal_variation: Vec<<E::G as Game>::M>,
@@ -399,7 +402,6 @@ pub struct ParallelSearch<E: Evaluator> {
     opts: IterativeOptions,
     par_opts: ParallelOptions,
 }
-
 impl<E: Evaluator> ParallelSearch<E> {
     pub fn new(eval: E, opts: IterativeOptions, par_opts: ParallelOptions) -> ParallelSearch<E> {
         let table = Arc::new(LockfreeTable::new(opts.table_byte_size));
@@ -409,6 +411,7 @@ impl<E: Evaluator> ParallelSearch<E> {
             max_depth: 99,
             max_time: Duration::from_secs(5),
             background_cancel: Arc::new(AtomicBool::new(false)),
+            stop_signal: Arc::new(AtomicBool::new(false)),
             table,
             prev_value: 0,
             principal_variation: Vec::new(),
@@ -431,6 +434,10 @@ impl<E: Evaluator> ParallelSearch<E> {
     /// Return the parallel options used in this search.
     pub fn parallel_options(&self) -> &ParallelOptions {
         &self.par_opts
+    }
+    /// Returns a handle to the signal used to stop the search.
+    pub fn stop_signal(&self) -> SearchStopSignal {
+        SearchStopSignal(self.stop_signal.clone())
     }
 
     fn pretty_stats(
@@ -462,11 +469,14 @@ where
         }
         // Cancel any ongoing background processing.
         self.background_cancel.store(true, Ordering::Relaxed);
+        // Reset timeout flag
+        self.stop_signal.store(false, Ordering::Relaxed);
         // Start timer if configured.
         let timeout = if self.max_time == Duration::new(0, 0) {
-            Arc::new(AtomicBool::new(false))
+            self.stop_signal.clone()
         } else {
-            timeout_signal(self.max_time)
+            timeout_signal(self.max_time, &self.stop_signal);
+            self.stop_signal.clone()
         };
 
         let (best_move, value) = {
